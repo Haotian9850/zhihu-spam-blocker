@@ -1,21 +1,28 @@
 const HIDE_REASON_MAP = {
     "KfeCollection-AnswerTopCard-Container": "付费内容",
-    "KfeCollection-FabledStatement": "虚构创作"
+    "KfeCollection-FabledStatement": "虚构创作",
+    "LabelContainer": "虚构创作"    // possible, need secondary check
 }   // key: badge name, value: reason
 
 const blockAllKfeCollectionBadges = () => {
-    // TODO add func call throttling to optimize
+    // TODO add throttling to optimize
     let params = new URLSearchParams(window.location.search);
-    if(params.get("hideSpam") === "false") {
+    const currUrl = $(location).attr("href");
+    if (!currUrl.match(/zhihu.com/g)) {
+        //console.log("Not a zhihu domain, not running extension...");
+        return;
+    }
+    if (params.get("hideSpam") === "false") {
         return;
     }
     const kfeCollectionBadgeClzName = "KfeCollection-AnswerTopCard-Container";
     const kfeCollectionFabledAnsClzName = "KfeCollection-FabledStatement";
+    const possibleFabledAnsClzName = "LabelContainer";
     const targetAnswerContainerClzName = "ContentItem AnswerItem";
     const allKfeCollectionBadges = $(`.${kfeCollectionBadgeClzName}`);
     const allKfeCollectionFabledAnsBadges = $(`.${kfeCollectionFabledAnsClzName}`);
-
-    const allSpamBadges = $.merge(allKfeCollectionBadges, allKfeCollectionFabledAnsBadges);
+    const allPossibleFabledBadge = $(`.${possibleFabledAnsClzName}`);
+    const allSpamBadges = $.merge(allKfeCollectionFabledAnsBadges, $.merge(allKfeCollectionBadges, allPossibleFabledBadge));
 
     const makeShowSpamBtn = (answerDom) => {
         const answerUrl = extractSingleAnswerUrl(answerDom);
@@ -29,7 +36,6 @@ const blockAllKfeCollectionBadges = () => {
     const extractSingleAnswerUrl = (answerDom) => {
         const answerId = answerDom.attr("name");
         const dataZaExtraModule = answerDom.attr("data-za-extra-module");
-        console.log("dataZaExtraModule: ", dataZaExtraModule);
         const questionId = JSON.parse(dataZaExtraModule)?.card?.content?.parent_token;
         if (!!answerId && !!questionId) {
             return `https://zhihu.com/question/${questionId}/answer/${answerId}?hideSpam=false`;
@@ -37,19 +43,31 @@ const blockAllKfeCollectionBadges = () => {
         return null;
     }
 
+    const findHideReason = (clzAttr) => {
+        const matchedKeys = Object.keys(HIDE_REASON_MAP).filter(h => clzAttr.includes(h));
+        if (!!matchedKeys?.length){
+            return HIDE_REASON_MAP[matchedKeys[0]];
+        }
+        return null;
+    }
+
     allSpamBadges.each(function(k){
-        const hideReason = Object.keys(HIDE_REASON_MAP).includes($(this).attr("class")) ? HIDE_REASON_MAP[$(this).attr("class")] : null;
+        if ($(this).attr("class").includes(possibleFabledAnsClzName)) {
+            if (!$(this).text().match(/包含虚构创作/)){
+                return; // e.g. continue
+            }
+        }
+        const hideReason = findHideReason($(this).attr("class"));
         const parents = $(this).parents(5);
         let answerContainer = null;
         parents.each(function(p){
             const clzName = $(this).attr("class");
             if (!!clzName && clzName === targetAnswerContainerClzName){
                 answerContainer = $(this);
-                return false;   // break from .each
+                return false;   // e.g. break
             }
         });
         if (!!answerContainer) {
-            const answerUrl = extractSingleAnswerUrl(answerContainer);
             answerContainer.hide();
             answerContainer.replaceWith(`<h2>${makePlaceholderText(hideReason)}&nbsp;${makeShowSpamBtn(answerContainer)}</h2>`);
         }
