@@ -1,6 +1,6 @@
 {
     "name": "Zhihu Spam Blocker",
-    "description": "A Chrome extension to block spam answers on zhihu.com - 用于屏蔽知乎上的垃圾回答的Chrome插件",
+    "description": "A Chrome extension to block spam answers on zhihu.com - 屏蔽知乎上的垃圾回答",
     "version": "0.1",
     "manifest_version": 3,
     "content_scripts": [{
